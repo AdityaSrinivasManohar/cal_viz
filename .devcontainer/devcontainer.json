@@ -1,0 +1,21 @@
+{
+  "name": "cal_viz (C++ arm64)",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  // Native arm64 on Apple Silicon — avoids x86 emulation.
+  "runArgs": ["--platform=linux/arm64"],
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cpptools-extension-pack",
+        "ms-vscode.cmake-tools"
+      ]
+    }
+  },
+  "postCreateCommand": "g++ --version && cmake --version"
+}
