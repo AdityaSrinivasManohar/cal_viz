@@ -1,5 +1,3 @@
-I plan to make a cpp project to do the following
-
 ### **Requirements**
 
 **Input**
@@ -16,7 +14,7 @@ I plan to make a cpp project to do the following
 - Identify all camera topics (`sensor_msgs/Image`, `sensor_msgs/CompressedImage`)
 - Auto-match `sensor_msgs/CameraInfo` to each camera topic by naming convention, falling back to `frame_id` matching
 - Build TF tree from `/tf` and `/tf_static`
-- Fallback to user-supplied `extrinsics.yaml` if TF is missing or incomplete
+- Fallback to user-supplied `extrinsics.xml` if TF is missing or incomplete
 
 **Pair Validation**
 
@@ -47,66 +45,62 @@ I plan to make a cpp project to do the following
 ---
 ### **Outputs**
 
-**Mode 1 — MCAP**
+**`unbag` — raw data extraction**
 
-- Annotated `CompressedImage` per valid pair per frame
-- Projected 2D points with depth metadata
-- All original topics passed through unchanged
-- Output viewable directly in Foxglove Studio
+Extracts raw sensor data from the bag, deduplicated per topic (no per-pair copies).
 
-**Mode 2 — Folder dump**
-
-- One `.pcd` per LiDAR scan (binary format, no library needed)
-- One `.jpg` per raw camera frame
-- One `.jpg` per projected frame (points overlaid)
+- One `.pcd` per LiDAR scan per LiDAR topic (binary format, no library needed)
+- One `.jpg` per camera frame per camera topic
+- `camera_info.yaml` with intrinsics for each camera topic
 - `timestamps.csv` mapping every file to log and publish timestamps
-- `camera_info.yaml` with intrinsics for each camera
-- `transforms.yaml` with all TF data used for each pair
-
-**Mode 3 — Both**
-
-- Produces both MCAP and folder dump simultaneously
-
-**Folder structure**
 
 ```
 output/
-├── <lidar_topic>__<camera_topic>/   # one dir per valid pair
-│   ├── pointclouds/
-│   │   └── <timestamp_ns>.pcd
-│   ├── images/
-│   │   └── <timestamp_ns>.jpg
-│   ├── projected/
-│   │   └── <timestamp_ns>.jpg
-│   ├── camera_info.yaml
-│   └── transforms.yaml
-├── timestamps.csv
-├── discovery_report.txt
-└── output.mcap                      # mode 1 or 3 only
+├── lidar/
+│   └── <lidar_topic>/
+│       └── <timestamp_ns>.pcd
+├── cameras/
+│   └── <camera_topic>/
+│       ├── <timestamp_ns>.jpg
+│       └── camera_info.yaml
+└── timestamps.csv
 ```
 
-**discovery_report.txt**
+**`project` — projection overlays**
 
-- All LiDAR and camera topics found
-- CameraInfo match result per camera topic
-- Per-pair: TF status, timestamp overlap, projection overlap %, decision
-- All warnings and skipped pairs with reasons
+Produces only the projected images (LiDAR points overlaid on camera frames) for each valid LiDAR × camera pair.
+
+- One `.jpg` per projected frame per valid pair
+- `transforms.yaml` with all TF data used for each pair
+
+```
+output/
+└── <lidar_topic>__<camera_topic>/   # one dir per valid pair
+    ├── projected/
+    │   └── <timestamp_ns>.jpg
+    └── transforms.yaml
+```
 
 ---
 
 ### **CLI**
 
 ```bash
-cal_viz \
-  --input     drive.bag             \
-  --output    ./out                 \
-  --mode      mcap|folder|both      \   # default: both
-  --colorize  depth|intensity|doppler|height|ring  \  # default: depth
-  --point-size         3            \   # default: 3px
-  --overlap-threshold  0.05         \   # default: 5%
-  --extrinsics extrinsics.yaml      \   # optional override
-  --lidar      /lidar_front         \   # optional force specific topics
-  --camera     /cam_front               # optional force specific topics
+# Extract raw sensor data (deduplicated per topic)
+cal_viz unbag \
+  --input   drive.bag   \
+  --output  ./out
+
+# Project LiDAR onto camera frames
+cal_viz project \
+  --input              drive.bag             \
+  --output             ./out                 \
+  --colorize           depth|intensity|doppler|height|ring  \  # default: depth
+  --point-size         3                     \   # default: 3px
+  --overlap-threshold  0.05                  \   # default: 5%
+  --extrinsics         extrinsics.yaml       \   # optional override
+  --lidar              /lidar_front          \   # optional: force specific topic
+  --camera             /cam_front                # optional: force specific topic
 ```
 
 ---
