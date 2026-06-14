@@ -20,7 +20,8 @@
       "Bash(cmake --version)",
       "Bash(curl -fsSL https://api.github.com/repos/Kitware/CMake/releases/latest)",
       "Bash(curl -fsSL https://github.com/Kitware/CMake/releases/download/v4.3.3/cmake-4.3.3-linux-aarch64.sh -o /tmp/cmake.sh)",
-      "Bash(sudo sh /tmp/cmake.sh --prefix=/usr/local --skip-license)"
+      "Bash(sudo sh /tmp/cmake.sh --prefix=/usr/local --skip-license)",
+      "Bash(g++ -std=c++20 -fsyntax-only -I src src/msgs/types.hpp)"
     ],
     "additionalDirectories": [
       "/tmp"
