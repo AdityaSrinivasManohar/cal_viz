@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 4.3)
 
 # Must be set before project() so CMake picks it up during compiler detection.
 if(NOT DEFINED CMAKE_CXX_COMPILER)
-    set(CMAKE_CXX_COMPILER clang++-23)
+    set(CMAKE_CXX_COMPILER clang++-22)
 endif()
 
 project(cal_viz CXX)
