@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(which mcap *)",
+      "Read(//usr/lib/**)",
+      "Bash(curl -fsSL https://github.com/foxglove/mcap/releases/latest/download/mcap-linux-arm64 -o /usr/local/bin/mcap)",
+      "Bash(chmod +x /usr/local/bin/mcap)",
+      "Bash(mcap version *)",
+      "Bash(curl -fsSL https://github.com/foxglove/mcap/releases/latest/download/mcap-linux-arm64 -o /tmp/mcap)",
+      "Bash(echo \"exit: $?\")",
+      "Read(//tmp/**)",
+      "Bash(xxd)",
+      "Bash(cp /tmp/mcap /usr/local/bin/mcap && chmod +x /usr/local/bin/mcap && mcap version)",
+      "Bash(sudo cp /tmp/mcap /usr/local/bin/mcap)",
+      "Bash(sudo chmod +x /usr/local/bin/mcap)",
+      "Bash(mcap --version)",
+      "Bash(cmake -B build)",
+      "Bash(cmake --build build)",
+      "Bash(git ls-remote *)",
+      "Bash(cmake --version)",
+      "Bash(curl -fsSL https://api.github.com/repos/Kitware/CMake/releases/latest)",
+      "Bash(curl -fsSL https://github.com/Kitware/CMake/releases/download/v4.3.3/cmake-4.3.3-linux-aarch64.sh -o /tmp/cmake.sh)",
+      "Bash(sudo sh /tmp/cmake.sh --prefix=/usr/local --skip-license)"
+    ],
+    "additionalDirectories": [
+      "/tmp"
+    ]
+  }
+}
