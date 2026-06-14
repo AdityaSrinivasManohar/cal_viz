@@ -27,7 +27,10 @@
       "Bash(apt-cache show *)",
       "Bash(apt-cache search *)",
       "Bash(apt-get update *)",
-      "Bash(sudo apt-get update -qq)"
+      "Bash(sudo apt-get update -qq)",
+      "Bash(which clang++ 2>/dev/null || which clang++-19 2>/dev/null || which clang++-18 2>/dev/null; ls /usr/bin/clang++* 2>/dev/null)",
+      "Read(//usr/bin/**)",
+      "Bash(cmake -B build -DCMAKE_CXX_COMPILER=clang++)"
     ],
     "additionalDirectories": [
       "/tmp"
