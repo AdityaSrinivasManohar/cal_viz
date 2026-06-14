@@ -4,6 +4,7 @@ project(cal_viz CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(BUILD_SHARED_LIBS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)  # lets CMake 4.x tolerate old cmake_minimum_required in fetched deps
 
 include(FetchContent)
