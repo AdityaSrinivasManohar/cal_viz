@@ -21,6 +21,5 @@
         "C_Cpp.intelliSenseEngine": "disabled"
       }
     }
-  },
-  "postCreateCommand": "g++ --version && cmake --version"
+  }
 }

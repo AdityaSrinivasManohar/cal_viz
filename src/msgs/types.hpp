@@ -40,9 +40,9 @@ struct CameraInfo : BaseType {
     uint32_t               width;
     std::string            distortion_model;  // "plumb_bob" | "equidistant"
     std::vector<double>    D;                 // distortion coefficients (length varies)
-    std::array<double, 9>  K;                // 3×3 intrinsic matrix (row-major)
-    std::array<double, 9>  R;                // 3×3 rectification matrix
-    std::array<double, 12> P;               // 3×4 projection matrix
+    std::array<double, 9>  K;                 // 3×3 intrinsic matrix (row-major)
+    std::array<double, 9>  R;                 // 3×3 rectification matrix
+    std::array<double, 12> P;                 // 3×4 projection matrix
 };
 
-} // namespace msgs
+}  // namespace msgs
