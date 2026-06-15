@@ -10,10 +10,11 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && wget -qO /etc/apt/trusted.gpg.d/apt.llvm.org.asc https://apt.llvm.org/llvm-snapshot.gpg.key \
     && echo "deb http://apt.llvm.org/trixie/ llvm-toolchain-trixie-22 main" > /etc/apt/sources.list.d/llvm.list \
     && apt-get update \
-    && apt-get -y install --no-install-recommends clang-22 clang-format-22 clang-tidy-22 \
+    && apt-get -y install --no-install-recommends clang-22 clang-format-22 clang-tidy-22 clangd-22 \
     && ln -sf /usr/bin/clang++-22     /usr/local/bin/clang++-22 \
     && ln -sf /usr/bin/clang-format-22 /usr/local/bin/clang-format \
     && ln -sf /usr/bin/clang-tidy-22   /usr/local/bin/clang-tidy \
+    && ln -sf /usr/bin/clangd-22       /usr/local/bin/clangd \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install CMake 4.3.3 from Kitware's pre-built aarch64 binary

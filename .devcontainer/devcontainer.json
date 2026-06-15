@@ -14,8 +14,12 @@
         "ms-vscode.cpptools",
         "ms-vscode.cpptools-extension-pack",
         "ms-vscode.cmake-tools",
-        "Anthropic.claude-code"
-      ]
+        "Anthropic.claude-code",
+        "llvm-vs-code-extensions.vscode-clangd"
+      ],
+      "settings": {
+        "C_Cpp.intelliSenseEngine": "disabled"
+      }
     }
   },
   "postCreateCommand": "g++ --version && cmake --version"
