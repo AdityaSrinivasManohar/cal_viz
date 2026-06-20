@@ -1,6 +1,6 @@
 # cal_viz
 
-Projects LiDAR and radar point clouds onto camera images from `.mcap` and ROS1 `.bag` files. No external bag parsing libraries — formats are read with raw byte parsing.
+Projects LiDAR and radar point clouds onto camera images from `.mcap` and ROS1 `.bag` files.
 
 ## Commands
 
@@ -49,21 +49,70 @@ out/
     └── transforms.yaml
 ```
 
-## Build
+## Development setup
 
-Requires CMake ≥ 3.20 and a C++20 compiler. All dependencies are fetched and statically linked automatically — no apt installs needed.
+The recommended way to work on this project is via the included devcontainer, which provides the full toolchain with no host setup required.
+
+**Prerequisites:** Docker and the VS Code Dev Containers extension (or any OCI-compatible runtime).
 
 ```bash
-cmake -B build && cmake --build build
+# In VS Code: "Dev Containers: Reopen in Container"
+# Or from the CLI:
+docker build -t cal_viz .devcontainer/
+docker run --rm -it -v $(pwd):/workspaces/cal_viz cal_viz
+```
+
+The container runs natively on arm64 (Apple Silicon). It provides:
+
+| Tool | Version |
+|---|---|
+| Clang / Clang++ | 22 |
+| clang-format | 22 |
+| clang-tidy | 22 |
+| clangd | 22 |
+| CMake | 4.3.3 |
+| mcap CLI | latest |
+
+### IDE integration (clangd)
+
+The project includes a `.clangd` config and `.vscode/settings.json` with format-on-save enabled. After opening the devcontainer in VS Code, install the `clangd` extension (`llvm-vs-code-extensions.vscode-clangd`) if it isn't already active, then run **clangd: Restart language server** from the command palette.
+
+clangd reads `build/compile_commands.json` for include paths and compiler flags. Run CMake configure at least once before opening source files (see Build below).
+
+## Build
+
+All dependencies are fetched and statically linked by CMake — no package manager installs needed beyond what the devcontainer provides.
+
+```bash
+cmake -B build
+cmake --build build
 ```
 
 The binary is at `./build/cal_viz`.
 
-On first configure, CMake fetches:
-- [Eigen 3.4.0](https://gitlab.com/libeigen/eigen.git) — matrix/quaternion math for projection and TF interpolation
-- [yaml-cpp 0.8.0](https://github.com/jbeder/yaml-cpp) — reading `extrinsics.yaml`, writing `camera_info.yaml` / `transforms.yaml`
+On first configure, CMake fetches and pins:
 
-[stb_image / stb_image_write](https://github.com/nothings/stb) is vendored directly in `third_party/stb/`.
+| Library | Version | Purpose |
+|---|---|---|
+| [Eigen](https://gitlab.com/libeigen/eigen.git) | 5.0.1 | Quaternion slerp, matrix–vector math for projection and TF interpolation |
+| [yaml-cpp](https://github.com/jbeder/yaml-cpp) | 0.8.0 | Reading `extrinsics.yaml`, writing `camera_info.yaml` / `transforms.yaml` |
+| [mcap](https://github.com/foxglove/mcap) | 2.1.3 | MCAP file reading (header-only, single-header compilation model) |
+
+[stb_image / stb_image_write](https://github.com/nothings/stb) is vendored in `third_party/stb/` and requires no fetch step.
+
+Internet access is only needed on the first `cmake -B build`. Subsequent builds and reconfigures are fully offline.
+
+### Parallel builds
+
+```bash
+cmake --build build --parallel
+```
+
+### Cleaning
+
+```bash
+rm -rf build && cmake -B build
+```
 
 ## Supported formats
 
@@ -93,5 +142,4 @@ Format is detected from file content, not the file extension.
 ## Out of scope
 
 - ROS2 `.db3` files — convert to MCAP first (`mcap convert`)
-- Any bag/MCAP parsing library
 - Radar-specific message types beyond `PointCloud2` with a doppler field
