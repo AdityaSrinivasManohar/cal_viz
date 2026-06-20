@@ -5,7 +5,16 @@
 
 McapReader::McapReader(const std::string& path) {
     auto status = reader_.open(path);
-    if (!status.ok()) throw std::runtime_error("McapReader: " + std::string(status.message));
+    if (!status.ok())
+        throw std::runtime_error("McapReader: " + std::string(status.message));
+
+    // In v2.x, open() only reads the header. readSummary() populates
+    // channels(), schemas(), and statistics(). AllowFallbackScan falls back
+    // to a sequential scan if the summary section is missing or incomplete.
+    status = reader_.readSummary(mcap::ReadSummaryMethod::AllowFallbackScan);
+    if (!status.ok())
+        throw std::runtime_error("McapReader: readSummary: " + std::string(status.message));
+
     iter_state_ = std::make_unique<IterState>(reader_);
 }
 

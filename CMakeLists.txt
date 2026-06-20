@@ -36,8 +36,9 @@ FetchContent_MakeAvailable(eigen yaml-cpp mcap)
 add_executable(cal_viz
     src/main.cpp
     src/bag/mcap_reader.cpp
+    src/msgs/deserialize.cpp
 )
 
 target_include_directories(cal_viz PRIVATE src third_party ${mcap_SOURCE_DIR}/cpp/mcap/include)
-target_compile_definitions(cal_viz PRIVATE MCAP_COMPRESSION_NO_LZ4 MCAP_COMPRESSION_NO_ZSTD)
-target_link_libraries(cal_viz PRIVATE Eigen3::Eigen yaml-cpp::yaml-cpp)
+target_compile_definitions(cal_viz PRIVATE MCAP_COMPRESSION_NO_LZ4)
+target_link_libraries(cal_viz PRIVATE Eigen3::Eigen yaml-cpp::yaml-cpp zstd)
