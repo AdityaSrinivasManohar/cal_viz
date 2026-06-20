@@ -11,8 +11,9 @@ Everything lives under `third_party/` and is statically compiled into the binary
 | **Eigen3** | Projection math requires reliable quaternion slerp, 3×3/3×4 matrix–vector multiply, and vector normalization. Rolling these by hand is error-prone (especially slerp edge cases near antipodal quaternions). Eigen is header-only so it adds zero link weight. | `FetchContent` — headers only, no build step |
 | **stb_image / stb_image_write** | `sensor_msgs/CompressedImage` arrives as a raw JPEG byte blob. We need a decoder to get a pixel buffer before we can draw on it, and an encoder to write the projected output JPEGs. A JPEG codec is non-trivial to write from scratch. stb is two single-header files with no dependencies, making it the smallest possible footprint for this. | Vendored directly in `third_party/stb/` — just two `.h` files committed to the repo |
 | **yaml-cpp** | We need to read user-supplied `extrinsics.yaml` (arbitrary structure, not a fixed binary format) and write `camera_info.yaml` / `transforms.yaml`. Hand-writing a YAML parser for the read path is fragile. yaml-cpp builds to a static archive with no transitive deps. | `FetchContent` — built from source as a static lib (`BUILD_SHARED_LIBS=OFF`) |
+| **mcap** | The MCAP format has enough edge cases (chunk compression, CRC validation, summary-section indexing) that a hand-rolled parser becomes a maintenance burden. The official Foxglove C++ library is header-only (single-header compilation model via `MCAP_IMPLEMENTATION`), handles all of these transparently, and has no transitive dependencies when compression is disabled. | `FetchContent` — headers only, `EXCLUDE_FROM_ALL` (no CMakeLists.txt in the repo), include path wired manually |
 
-No external library is used for MCAP or ROS1 bag parsing — those remain raw byte parsing as required.
+ROS1 `.bag` parsing remains raw byte parsing — no external library is used for it.
 
 **third_party layout**
 
@@ -30,23 +31,33 @@ third_party/
 **CMakeLists.txt**
 
 ```cmake
-cmake_minimum_required(VERSION 3.20)
-project(cal_viz)
+cmake_minimum_required(VERSION 4.3)
+project(cal_viz CXX)
 
 set(CMAKE_CXX_STANDARD 20)
-set(BUILD_SHARED_LIBS OFF)   # force static for all FetchContent deps
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(BUILD_SHARED_LIBS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(FetchContent)
 
 FetchContent_Declare(eigen
     GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
-    GIT_TAG        3.4.0
+    GIT_TAG        5.0.1
+    GIT_SHALLOW    TRUE
 )
 FetchContent_Declare(yaml-cpp
     GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
     GIT_TAG        0.8.0
+    GIT_SHALLOW    TRUE
 )
-FetchContent_MakeAvailable(eigen yaml-cpp)
+FetchContent_Declare(mcap
+    GIT_REPOSITORY https://github.com/foxglove/mcap.git
+    GIT_TAG        releases/cpp/v2.1.3
+    GIT_SHALLOW    TRUE
+    EXCLUDE_FROM_ALL  # header-only, no CMakeLists.txt
+)
+FetchContent_MakeAvailable(eigen yaml-cpp mcap)
 
 add_executable(cal_viz
     src/main.cpp
@@ -63,7 +74,8 @@ add_executable(cal_viz
     src/commands/project.cpp
 )
 
-target_include_directories(cal_viz PRIVATE src third_party)
+target_include_directories(cal_viz PRIVATE src third_party ${mcap_SOURCE_DIR}/cpp/mcap/include)
+target_compile_definitions(cal_viz PRIVATE MCAP_COMPRESSION_NO_LZ4 MCAP_COMPRESSION_NO_ZSTD)
 target_link_libraries(cal_viz PRIVATE Eigen3::Eigen yaml-cpp::yaml-cpp)
 ```
 

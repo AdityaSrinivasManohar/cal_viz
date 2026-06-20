@@ -141,58 +141,46 @@ records            : bytes    ← the (possibly compressed) record stream
 
 The `records` field is itself a sequence of MCAP records — Schema, Channel, and Message records can all appear inside a chunk exactly as they do at the top level. Chunks **cannot** be nested.
 
-When `compression = "none"`, `records` is a raw record stream and can be parsed directly. Compressed chunks require a decompression step before parsing. This implementation only supports `"none"`; encountering a compressed chunk throws a `std::runtime_error`.
+When `compression = "none"`, `records` is a raw record stream and can be parsed directly. Compressed chunks (`lz4`, `zstd`) require a decompression step before parsing.
 
 ---
 
 ## Parsing Strategy
 
-We use a **single-pass, pull-based** approach: the caller calls `next()` and gets one `RawMessage` at a time. Nothing is buffered beyond the current chunk.
+Parsing is delegated to the **Foxglove MCAP C++ library** (`foxglove/mcap`, v2.1.3). We do not hand-roll byte parsing.
 
-### The read source
+The library uses a single-header compilation model: including `<mcap/reader.hpp>` provides declarations; defining `MCAP_IMPLEMENTATION` in exactly one translation unit (`mcap_reader.cpp`) compiles the implementations from the accompanying `.inl` files. Compression support is disabled at compile time via `MCAP_COMPRESSION_NO_LZ4` and `MCAP_COMPRESSION_NO_ZSTD` — these macros are set project-wide in `CMakeLists.txt`.
 
-The key abstraction is `read_into(dst, n)`, which reads `n` bytes from whichever source is currently active:
+### What the library provides
 
-- **Normal mode**: reads directly from `file_`.
-- **Chunk mode**: reads from `chunk_buf_`, a `std::vector<uint8_t>` holding the current chunk's uncompressed record stream. `chunk_pos_` tracks how far we've consumed it.
+- **`mcap::McapReader::open(path)`** — opens the file, reads and validates the magic bytes and Header record, and parses the summary section (if present) to populate channel/schema maps and statistics.
+- **`reader.channels()` / `reader.schemas()`** — pre-populated maps available immediately after `open()`, used by `topics()` without scanning the data section.
+- **`reader.statistics()`** — returns per-channel message counts from the summary section, also without a data scan.
+- **`reader.readMessages()`** — returns a lazy `LinearMessageView` range. Iterating it streams messages front-to-back, handling chunk decompression, record framing, and schema/channel resolution internally.
 
-All typed readers (`r_u8`, `r_u16`, `r_u32`, `r_u64`, `r_str`, `skip`) are built on `read_into`, so the same code path handles both in-chunk and out-of-chunk records transparently.
-
-### Main loop (next / topics)
+### How McapReader wraps it
 
 ```
-loop:
-  if chunk_buf_ is exhausted → clear it (fall back to file_)
-  if file_ is at EOF → return false / stop
+McapReader::topics()
+  → reader_.channels() + reader_.schemas() + reader_.statistics()
+  → O(num_channels) — no file scan
 
-  op, len = read record header
+McapReader::next()
+  → advance LinearMessageView::Iterator
+  → copy mv.channel->topic, mv.schema->name, mv.message.logTime/publishTime
+  → memcpy mv.message.data into RawMessage::data
+  → return true
 
-  DataEnd  → stop
-  Chunk    → load body into chunk_buf_, continue
-  Schema   → parse, store in schema_names_, continue
-  Channel  → parse, store in channels_, continue
-  Message  → fill RawMessage, return true     (next only)
-           → count per channel_id, skip data  (topics only)
-  other    → skip(len)
+McapReader::rewind()
+  → recreate IterState{ view = reader_.readMessages(), it = view.begin() }
 ```
 
-Entering a chunk means reading its body from `file_` into `chunk_buf_` in one bulk read. After that, the loop's next iteration draws from `chunk_buf_` instead of `file_` until the buffer is exhausted, at which point normal file reading resumes.
+The `IterState` struct bundles the `LinearMessageView` and its iterator together so their lifetimes are tied. It is stored in a `unique_ptr` declared after `mcap::McapReader reader_`, ensuring it is destroyed first (C++ destroys members in reverse declaration order).
 
-Because Schema and Channel records accumulate into member maps (`schema_names_`, `channels_`), they are registered once and available for all subsequent Message records regardless of whether they appeared at the top level or inside a chunk.
+### What we still do not support
 
-### topics() vs next()
-
-`topics()` rewinds to `data_start_`, runs the same loop but skips message data entirely (reads channel_id, increments a counter, skips the remaining bytes), then returns a `TopicInfo` per channel. It calls `rewind()` again before returning so the reader is ready to stream from the start.
-
-`next()` runs the same loop but copies message bytes into `RawMessage::data` and returns to the caller immediately. Schema and channel state accumulated during `topics()` is reused, so `next()` will not re-parse them on the second pass — it just overwrites with identical values if it encounters them again.
-
----
-
-## What We Do Not Support
-
-| Feature | Reason omitted |
+| Feature | Reason |
 |---|---|
-| Compressed chunks (lz4 / zstd) | No decompression library — design constraint |
-| Summary section fast-path for `topics()` | Full scan is sufficient; avoids footer seek complexity |
-| CRC validation | Adds overhead; trust the storage layer |
+| Compressed chunks (lz4 / zstd) | `MCAP_COMPRESSION_NO_LZ4/ZSTD` disabled at compile time; add lz4/zstd deps to enable |
+| CRC validation | Library supports it but we leave it at default (disabled) |
 | Attachment / Metadata records | Not needed for sensor data extraction |

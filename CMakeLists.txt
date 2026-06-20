@@ -25,9 +25,19 @@ FetchContent_Declare(yaml-cpp
     GIT_TAG        0.8.0
     GIT_SHALLOW    TRUE
 )
-FetchContent_MakeAvailable(eigen yaml-cpp)
+FetchContent_Declare(mcap
+    GIT_REPOSITORY https://github.com/foxglove/mcap.git
+    GIT_TAG        releases/cpp/v2.1.3
+    GIT_SHALLOW    TRUE
+    EXCLUDE_FROM_ALL  # header-only, no CMakeLists.txt — skip add_subdirectory
+)
+FetchContent_MakeAvailable(eigen yaml-cpp mcap)
 
-add_executable(cal_viz src/main.cpp)
+add_executable(cal_viz
+    src/main.cpp
+    src/bag/mcap_reader.cpp
+)
 
-target_include_directories(cal_viz PRIVATE src third_party)
+target_include_directories(cal_viz PRIVATE src third_party ${mcap_SOURCE_DIR}/cpp/mcap/include)
+target_compile_definitions(cal_viz PRIVATE MCAP_COMPRESSION_NO_LZ4 MCAP_COMPRESSION_NO_ZSTD)
 target_link_libraries(cal_viz PRIVATE Eigen3::Eigen yaml-cpp::yaml-cpp)
