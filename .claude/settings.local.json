@@ -30,7 +30,8 @@
       "Bash(sudo apt-get update -qq)",
       "Bash(which clang++ 2>/dev/null || which clang++-19 2>/dev/null || which clang++-18 2>/dev/null; ls /usr/bin/clang++* 2>/dev/null)",
       "Read(//usr/bin/**)",
-      "Bash(cmake -B build -DCMAKE_CXX_COMPILER=clang++)"
+      "Bash(cmake -B build -DCMAKE_CXX_COMPILER=clang++)",
+      "Bash(cmake --build /workspaces/cal_viz/build --target cal_viz)"
     ],
     "additionalDirectories": [
       "/tmp"
