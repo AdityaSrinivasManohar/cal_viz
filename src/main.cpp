@@ -9,6 +9,7 @@
 
 #include "bag/mcap_reader.hpp"
 #include "msgs/deserialize.hpp"
+#include "pcd/pcd_writer.hpp"
 #include "projection/project.hpp"
 #include "tf/tf_buffer.hpp"
 
@@ -60,8 +61,12 @@ int main(int argc, char** argv) {
             if (auto info = msgs::as_camera_info(msg))
                 cam_infos[msg.topic] = std::move(*info);
         } else if (msg.msg_type.ends_with("PointCloud2")) {
-            if (auto cloud = msgs::as_point_cloud(msg))
+            if (auto cloud = msgs::as_point_cloud(msg)) {
+                std::string rel      = msg.topic.front() == '/' ? msg.topic.substr(1) : msg.topic;
+                fs::path    pcd_path = out_dir / rel / (std::to_string(msg.log_time_ns) + ".pcd");
+                pcd::write(*cloud, pcd_path);
                 clouds[msg.log_time_ns] = std::move(*cloud);
+            }
         }
     }
 
