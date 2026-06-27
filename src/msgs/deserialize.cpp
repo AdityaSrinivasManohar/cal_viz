@@ -92,7 +92,12 @@ private:
     size_t         pos_;
     bool           bad_{false};
 
-    void align(size_t n) { pos_ = (pos_ + n - 1) & ~(n - 1); }
+    // CDR alignment is relative to the start of the data section (byte 4,
+    // after the 4-byte encapsulation header), not from the buffer start.
+    void align(size_t n) {
+        size_t data_pos = pos_ - 4;
+        pos_            = ((data_pos + n - 1) & ~(n - 1)) + 4;
+    }
 
     void check(size_t n) {
         if (pos_ + n > size_) {

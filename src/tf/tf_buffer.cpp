@@ -86,14 +86,18 @@ std::optional<Transform> TfBuffer::lookup(const std::string& from_frame,
 
         std::optional<Transform> edge;
 
+        // static_[{P,C}] maps C→P (p_parent = R*p_child + t).
+        // For BFS edge a→b we want the transform that maps a→b:
+        //   {a,b}: parent=a, child=b → maps b→a → invert
+        //   {b,a}: parent=b, child=a → maps a→b → use directly
         if (auto it = static_.find({a, b}); it != static_.end())
-            edge = it->second.tf;
-        else if (auto it = static_.find({b, a}); it != static_.end())
             edge = inverse(it->second.tf);
+        else if (auto it = static_.find({b, a}); it != static_.end())
+            edge = it->second.tf;
         else if (auto it = dynamic_.find({a, b}); it != dynamic_.end())
-            edge = interpolate(it->second, stamp_ns);
-        else if (auto it = dynamic_.find({b, a}); it != dynamic_.end())
             edge = inverse(interpolate(it->second, stamp_ns));
+        else if (auto it = dynamic_.find({b, a}); it != dynamic_.end())
+            edge = interpolate(it->second, stamp_ns);
 
         if (!edge) return std::nullopt;
         result = chain(result, *edge);

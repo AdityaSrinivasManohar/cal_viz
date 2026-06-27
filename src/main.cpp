@@ -54,17 +54,8 @@ int main(int argc, char** argv) {
     while (reader.next(msg)) {
         if (msg.msg_type.ends_with("TFMessage")) {
             bool is_static = msg.topic == "/tf_static";
-            if (is_static) {
-                std::cout << "tf_static raw bytes[0..19]: ";
-                for (int i = 0; i < std::min<int>(20, msg.data.size()); ++i)
-                    std::cout << (int)msg.data[i] << " ";
-                std::cout << "\n";
-            }
-            for (auto& st : msgs::as_tf_message(msg)) {
+            for (auto& st : msgs::as_tf_message(msg))
                 is_static ? tf.add_static(st) : tf.add_dynamic(st);
-                if (is_static)
-                    std::cout << "[tf_static] " << st.parent_frame << " -> " << st.child_frame << "\n";
-            }
         } else if (msg.msg_type.ends_with("CameraInfo")) {
             if (auto info = msgs::as_camera_info(msg))
                 cam_infos[msg.topic] = std::move(*info);
