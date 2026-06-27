@@ -102,11 +102,12 @@ private:
     }
 };
 
-// Read the common std_msgs/Header fields, return a Timestamp.
-msgs::Timestamp read_header(CdrReader& r) {
-    msgs::Timestamp ts{r.i32(), r.u32()};
-    r.str();  // frame_id — unused at this layer
-    return ts;
+// Read the common std_msgs/Header fields into a BaseType.
+msgs::BaseType read_header(CdrReader& r) {
+    msgs::BaseType base;
+    base.timestamp = {r.i32(), r.u32()};
+    base.frame_id  = r.str();
+    return base;
 }
 
 // Extract a float value from a raw point record at the given byte offset.
@@ -138,7 +139,7 @@ std::optional<PointCloud> as_point_cloud(const RawMessage& msg) {
         CdrReader r(msg.data);
 
         PointCloud cloud;
-        cloud.timestamp = read_header(r);
+        static_cast<msgs::BaseType&>(cloud) = read_header(r);
 
         uint32_t height = r.u32();
         uint32_t width = r.u32();
@@ -203,7 +204,7 @@ std::optional<Image> as_image(const RawMessage& msg) {
         try {
             CdrReader r(msg.data);
             Image     img;
-            img.timestamp = read_header(r);
+            static_cast<msgs::BaseType&>(img) = read_header(r);
             r.str();  // format ("jpeg" / "png") — stb detects automatically
 
             uint32_t compressed_len = r.u32();
@@ -230,7 +231,7 @@ std::optional<Image> as_image(const RawMessage& msg) {
     try {
         CdrReader r(msg.data);
         Image     img;
-        img.timestamp = read_header(r);
+        static_cast<msgs::BaseType&>(img) = read_header(r);
 
         img.height = r.u32();
         img.width = r.u32();
@@ -295,7 +296,7 @@ std::optional<CameraInfo> as_camera_info(const RawMessage& msg) {
     try {
         CdrReader  r(msg.data);
         CameraInfo info;
-        info.timestamp = read_header(r);
+        static_cast<msgs::BaseType&>(info) = read_header(r);
         info.height = r.u32();
         info.width = r.u32();
         info.distortion_model = r.str();

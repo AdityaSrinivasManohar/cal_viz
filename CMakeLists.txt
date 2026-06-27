@@ -38,6 +38,7 @@ add_executable(cal_viz
     src/bag/mcap_reader.cpp
     src/msgs/deserialize.cpp
     src/tf/tf_buffer.cpp
+    src/projection/project.cpp
 )
 
 target_include_directories(cal_viz PRIVATE src third_party ${mcap_SOURCE_DIR}/cpp/mcap/include)

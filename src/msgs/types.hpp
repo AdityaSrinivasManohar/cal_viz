@@ -13,7 +13,8 @@ struct Timestamp {
 };
 
 struct BaseType {
-    Timestamp timestamp;
+    Timestamp   timestamp;
+    std::string frame_id;
 };
 
 struct Point {
