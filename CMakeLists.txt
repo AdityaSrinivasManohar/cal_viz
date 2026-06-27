@@ -35,10 +35,13 @@ FetchContent_MakeAvailable(eigen yaml-cpp mcap)
 
 add_executable(cal_viz
     src/main.cpp
+    src/stb_impl.cpp
     src/bag/mcap_reader.cpp
     src/msgs/deserialize.cpp
     src/tf/tf_buffer.cpp
     src/projection/project.cpp
+    src/commands/unbag.cpp
+    src/commands/project.cpp
 )
 
 target_include_directories(cal_viz PRIVATE src third_party ${mcap_SOURCE_DIR}/cpp/mcap/include)

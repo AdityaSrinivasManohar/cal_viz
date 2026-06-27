@@ -1,4 +1,3 @@
-#define STB_IMAGE_IMPLEMENTATION
 #include "msgs/deserialize.hpp"
 
 #include <stb/stb_image.h>
