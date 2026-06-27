@@ -1,7 +1,7 @@
 #define STB_IMAGE_IMPLEMENTATION
-#include <stb/stb_image.h>
-
 #include "msgs/deserialize.hpp"
+
+#include <stb/stb_image.h>
 
 #include <cassert>
 #include <cmath>
@@ -29,7 +29,7 @@ public:
 
     // Return a raw pointer to the current position (e.g. for zero-copy point data).
     const uint8_t* raw_ptr() const { return data_ + pos_; }
-    size_t         pos()     const { return pos_; }
+    size_t         pos() const { return pos_; }
 
     void skip(size_t n) { pos_ += n; }
 
@@ -41,7 +41,8 @@ public:
     bool boolean() { return u8() != 0; }
 
     int32_t i32() {
-        align(4); check(4);
+        align(4);
+        check(4);
         int32_t v;
         std::memcpy(&v, data_ + pos_, 4);
         pos_ += 4;
@@ -49,7 +50,8 @@ public:
     }
 
     uint32_t u32() {
-        align(4); check(4);
+        align(4);
+        check(4);
         uint32_t v;
         std::memcpy(&v, data_ + pos_, 4);
         pos_ += 4;
@@ -57,7 +59,8 @@ public:
     }
 
     float f32() {
-        align(4); check(4);
+        align(4);
+        check(4);
         float v;
         std::memcpy(&v, data_ + pos_, 4);
         pos_ += 4;
@@ -65,7 +68,8 @@ public:
     }
 
     double f64() {
-        align(8); check(8);
+        align(8);
+        check(8);
         double v;
         std::memcpy(&v, data_ + pos_, 8);
         pos_ += 8;
@@ -136,32 +140,37 @@ std::optional<PointCloud> as_point_cloud(const RawMessage& msg) {
         PointCloud cloud;
         cloud.timestamp = read_header(r);
 
-        uint32_t height     = r.u32();
-        uint32_t width      = r.u32();
+        uint32_t height = r.u32();
+        uint32_t width = r.u32();
         uint32_t num_points = height * width;
 
         // PointField[]: name, offset, datatype, count
-        struct FieldDef { std::string name; uint32_t offset; uint8_t datatype; };
-        uint32_t nfields = r.u32();
+        struct FieldDef {
+            std::string name;
+            uint32_t    offset;
+            uint8_t     datatype;
+        };
+        uint32_t              nfields = r.u32();
         std::vector<FieldDef> fields(nfields);
         for (auto& f : fields) {
-            f.name     = r.str();
-            f.offset   = r.u32();
+            f.name = r.str();
+            f.offset = r.u32();
             f.datatype = r.u8();
             r.u32();  // count — always 1 for sensor data
         }
 
-        r.boolean();             // is_bigendian
+        r.boolean();  // is_bigendian
         uint32_t point_step = r.u32();
-        r.u32();                 // row_step
+        r.u32();  // row_step
 
-        uint32_t       data_len  = r.u32();
-        const uint8_t* raw_pts   = r.raw_ptr();
+        uint32_t       data_len = r.u32();
+        const uint8_t* raw_pts = r.raw_ptr();
         r.skip(data_len);
 
         // Look up field offsets by name.
         auto find = [&](const std::string& name) -> const FieldDef* {
-            for (auto& f : fields) if (f.name == name) return &f;
+            for (auto& f : fields)
+                if (f.name == name) return &f;
             return nullptr;
         };
 
@@ -174,13 +183,12 @@ std::optional<PointCloud> as_point_cloud(const RawMessage& msg) {
 
         cloud.points.resize(num_points);
         for (uint32_t i = 0; i < num_points; ++i) {
-            const uint8_t* p  = raw_pts + i * point_step;
+            const uint8_t* p = raw_pts + i * point_step;
             cloud.points[i].x = extract_field(p, fx->offset, fx->datatype);
             cloud.points[i].y = extract_field(p, fy->offset, fy->datatype);
             cloud.points[i].z = extract_field(p, fz->offset, fz->datatype);
-            cloud.points[i].intensity = fi
-                ? extract_field(p, fi->offset, fi->datatype)
-                : std::numeric_limits<float>::quiet_NaN();
+            cloud.points[i].intensity = fi ? extract_field(p, fi->offset, fi->datatype)
+                                           : std::numeric_limits<float>::quiet_NaN();
         }
 
         return cloud;
@@ -194,20 +202,19 @@ std::optional<Image> as_image(const RawMessage& msg) {
     if (msg.msg_type.ends_with("CompressedImage")) {
         try {
             CdrReader r(msg.data);
-            Image img;
+            Image     img;
             img.timestamp = read_header(r);
             r.str();  // format ("jpeg" / "png") — stb detects automatically
 
             uint32_t compressed_len = r.u32();
 
-            int w = 0, h = 0, ch = 0;
-            uint8_t* pixels = stbi_load_from_memory(
-                r.raw_ptr(), static_cast<int>(compressed_len),
-                &w, &h, &ch, 3);  // force RGB output
+            int      w = 0, h = 0, ch = 0;
+            uint8_t* pixels = stbi_load_from_memory(r.raw_ptr(), static_cast<int>(compressed_len),
+                                                    &w, &h, &ch, 3);  // force RGB output
 
             if (!pixels) return std::nullopt;
 
-            img.width  = static_cast<uint32_t>(w);
+            img.width = static_cast<uint32_t>(w);
             img.height = static_cast<uint32_t>(h);
             img.data.assign(pixels, pixels + w * h * 3);
             stbi_image_free(pixels);
@@ -222,16 +229,16 @@ std::optional<Image> as_image(const RawMessage& msg) {
 
     try {
         CdrReader r(msg.data);
-        Image img;
+        Image     img;
         img.timestamp = read_header(r);
 
-        img.height           = r.u32();
-        img.width            = r.u32();
+        img.height = r.u32();
+        img.width = r.u32();
         std::string encoding = r.str();
-        r.boolean();               // is_bigendian
-        uint32_t step        = r.u32();
-        uint32_t data_len    = r.u32();
-        const uint8_t* raw   = r.raw_ptr();
+        r.boolean();  // is_bigendian
+        uint32_t       step = r.u32();
+        uint32_t       data_len = r.u32();
+        const uint8_t* raw = r.raw_ptr();
 
         img.data.resize(img.height * img.width * 3);
         uint8_t* dst = img.data.data();
@@ -245,9 +252,9 @@ std::optional<Image> as_image(const RawMessage& msg) {
                 const uint8_t* src = raw + row * step;
                 uint8_t*       out = dst + row * img.width * 3;
                 for (uint32_t col = 0; col < img.width; ++col) {
-                    out[col*3+0] = src[col*3+2];
-                    out[col*3+1] = src[col*3+1];
-                    out[col*3+2] = src[col*3+0];
+                    out[col * 3 + 0] = src[col * 3 + 2];
+                    out[col * 3 + 1] = src[col * 3 + 1];
+                    out[col * 3 + 2] = src[col * 3 + 0];
                 }
             }
 
@@ -256,7 +263,7 @@ std::optional<Image> as_image(const RawMessage& msg) {
                 const uint8_t* src = raw + row * step;
                 uint8_t*       out = dst + row * img.width * 3;
                 for (uint32_t col = 0; col < img.width; ++col)
-                    out[col*3+0] = out[col*3+1] = out[col*3+2] = src[col];
+                    out[col * 3 + 0] = out[col * 3 + 1] = out[col * 3 + 2] = src[col];
             }
 
         } else if (encoding == "16UC1") {
@@ -268,7 +275,7 @@ std::optional<Image> as_image(const RawMessage& msg) {
                     uint16_t val;
                     std::memcpy(&val, src + col * 2, 2);
                     uint8_t v8 = static_cast<uint8_t>(val >> 8);
-                    out[col*3+0] = out[col*3+1] = out[col*3+2] = v8;
+                    out[col * 3 + 0] = out[col * 3 + 1] = out[col * 3 + 2] = v8;
                 }
             }
 
@@ -286,11 +293,11 @@ std::optional<CameraInfo> as_camera_info(const RawMessage& msg) {
     if (!msg.msg_type.ends_with("CameraInfo")) return std::nullopt;
 
     try {
-        CdrReader r(msg.data);
+        CdrReader  r(msg.data);
         CameraInfo info;
-        info.timestamp        = read_header(r);
-        info.height           = r.u32();
-        info.width            = r.u32();
+        info.timestamp = read_header(r);
+        info.height = r.u32();
+        info.width = r.u32();
         info.distortion_model = r.str();
 
         // D — variable-length sequence of float64

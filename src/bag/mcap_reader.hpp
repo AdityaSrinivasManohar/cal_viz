@@ -1,11 +1,11 @@
 #pragma once
 
-#include "bag_reader.hpp"
-
 #include <mcap/reader.hpp>
 #include <memory>
 #include <string>
 #include <vector>
+
+#include "bag_reader.hpp"
 
 class McapReader : public BagReader {
 public:
@@ -22,8 +22,7 @@ private:
         mcap::LinearMessageView           view;
         mcap::LinearMessageView::Iterator it;
 
-        explicit IterState(mcap::McapReader& r)
-            : view(r.readMessages()), it(view.begin()) {}
+        explicit IterState(mcap::McapReader& r) : view(r.readMessages()), it(view.begin()) {}
     };
 
     mcap::McapReader           reader_;      // owns the file handle

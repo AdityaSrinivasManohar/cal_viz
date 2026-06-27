@@ -1,9 +1,9 @@
 #pragma once
 
+#include <optional>
+
 #include "bag/bag_reader.hpp"
 #include "msgs/types.hpp"
-
-#include <optional>
 
 namespace msgs {
 
