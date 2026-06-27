@@ -316,4 +316,45 @@ std::optional<CameraInfo> as_camera_info(const RawMessage& msg) {
     }
 }
 
+std::vector<StampedTransform> as_tf_message(const RawMessage& msg) {
+    if (!msg.msg_type.ends_with("TFMessage")) return {};
+
+    // tf2_msgs/TFMessage CDR layout:
+    //   uint32 count
+    //   for each TransformStamped:
+    //     Header:  stamp.sec (int32), stamp.nanosec (uint32), frame_id (string)
+    //     string   child_frame_id
+    //     Vector3: translation.x/y/z (float64 × 3)
+    //     Quaternion: rotation.x/y/z/w (float64 × 4)
+
+    try {
+        CdrReader r(msg.data);
+
+        uint32_t                      count = r.u32();
+        std::vector<StampedTransform> result;
+        result.reserve(count);
+
+        for (uint32_t i = 0; i < count; ++i) {
+            int32_t  sec     = r.i32();
+            uint32_t nanosec = r.u32();
+            auto     parent  = r.str();
+            auto     child   = r.str();
+
+            double tx = r.f64(), ty = r.f64(), tz = r.f64();
+            double qx = r.f64(), qy = r.f64(), qz = r.f64(), qw = r.f64();
+
+            result.push_back({
+                static_cast<uint64_t>(sec) * 1'000'000'000ULL + nanosec,
+                std::move(parent),
+                std::move(child),
+                {{tx, ty, tz}, {qx, qy, qz, qw}},
+            });
+        }
+
+        return result;
+    } catch (...) {
+        return {};
+    }
+}
+
 }  // namespace msgs
