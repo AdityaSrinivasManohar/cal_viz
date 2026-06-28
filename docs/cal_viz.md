@@ -72,7 +72,7 @@ cal_viz project \
 
 ---
 
-### **Non-requirements (explicitly out of scope)**
+### **Non-requirements (or TODOs)**
 
 - ROS1 `.bag` parsing — convert to MCAP first (`mcap convert`)
 - ROS2 `.db3` parsing — convert to MCAP first (`mcap convert`)
