@@ -120,6 +120,21 @@ The container runs natively on arm64 (Apple Silicon). It provides:
 | CMake | 4.3.3 |
 | mcap CLI | latest |
 
+### Formatting and static analysis
+
+Format all source files in-place:
+
+```bash
+find src -name '*.cpp' -o -name '*.hpp' | xargs clang-format -i
+```
+
+Run clang-tidy (requires a configured build for `compile_commands.json`):
+
+```bash
+cmake -B build
+find src -name '*.cpp' | xargs clang-tidy
+```
+
 ### IDE integration (clangd)
 
 The project includes a `.clangd` config and `.vscode/settings.json` with format-on-save enabled. After opening the devcontainer in VS Code, install the `clangd` extension (`llvm-vs-code-extensions.vscode-clangd`) if it isn't already active, then run **clangd: Restart language server** from the command palette.
