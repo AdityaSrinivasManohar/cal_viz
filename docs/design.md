@@ -4,29 +4,24 @@
 
 ### Dependencies
 
-Everything lives under `third_party/` and is statically compiled into the binary. There are no dynamic link dependencies and no host packages required beyond a C++20 compiler and CMake.
+Everything is statically compiled into the binary. There are no dynamic link dependencies and no host packages required beyond a C++20 compiler and CMake.
 
 | Library | Why we need it | How it's included |
 |---|---|---|
 | **Eigen3** | Projection math requires reliable quaternion slerp, 3×3/3×4 matrix–vector multiply, and vector normalization. Rolling these by hand is error-prone (especially slerp edge cases near antipodal quaternions). Eigen is header-only so it adds zero link weight. | `FetchContent` — headers only, no build step |
-| **stb_image / stb_image_write** | `sensor_msgs/CompressedImage` arrives as a raw JPEG byte blob. We need a decoder to get a pixel buffer before we can draw on it, and an encoder to write the projected output JPEGs. A JPEG codec is non-trivial to write from scratch. stb is two single-header files with no dependencies, making it the smallest possible footprint for this. | Vendored directly in `third_party/stb/` — just two `.h` files committed to the repo |
-| **yaml-cpp** | We need to read user-supplied `extrinsics.yaml` (arbitrary structure, not a fixed binary format) and write `camera_info.yaml` / `transforms.yaml`. Hand-writing a YAML parser for the read path is fragile. yaml-cpp builds to a static archive with no transitive deps. | `FetchContent` — built from source as a static lib (`BUILD_SHARED_LIBS=OFF`) |
-| **mcap** | The MCAP format has enough edge cases (chunk compression, CRC validation, summary-section indexing) that a hand-rolled parser becomes a maintenance burden. The official Foxglove C++ library is header-only (single-header compilation model via `MCAP_IMPLEMENTATION`), handles all of these transparently, and has no transitive dependencies when compression is disabled. | `FetchContent` — headers only, `EXCLUDE_FROM_ALL` (no CMakeLists.txt in the repo), include path wired manually |
-
-ROS1 `.bag` parsing remains raw byte parsing — no external library is used for it.
+| **stb_image / stb_image_write** | `sensor_msgs/CompressedImage` arrives as a raw JPEG byte blob. We need a decoder to get a pixel buffer before we can draw on it, and an encoder to write the projected output JPEGs. stb is two single-header files with no dependencies. | Vendored in `third_party/stb/` — committed directly to the repo |
+| **mcap** | The MCAP format has enough edge cases (chunk compression, CRC validation, summary-section indexing) that a hand-rolled parser becomes a maintenance burden. The official Foxglove C++ library is header-only and handles all of these transparently. | `FetchContent` — headers only, `EXCLUDE_FROM_ALL` |
 
 **third_party layout**
 
 ```
 third_party/
-├── stb/
-│   ├── stb_image.h          # vendored — commit directly
-│   └── stb_image_write.h
-├── eigen/                   # populated by FetchContent at configure time
-└── yaml-cpp/                # populated by FetchContent at configure time
+└── stb/
+    ├── stb_image.h
+    └── stb_image_write.h
 ```
 
-`stb` headers are committed directly to the repo. Eigen and yaml-cpp are fetched and pinned to a specific git tag by CMake at configure time — no internet access needed after the first `cmake -B build`.
+stb headers are committed directly to the repo. Eigen and mcap are fetched and pinned to specific git tags by CMake at configure time.
 
 **CMakeLists.txt**
 
@@ -46,37 +41,28 @@ FetchContent_Declare(eigen
     GIT_TAG        5.0.1
     GIT_SHALLOW    TRUE
 )
-FetchContent_Declare(yaml-cpp
-    GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
-    GIT_TAG        0.8.0
-    GIT_SHALLOW    TRUE
-)
 FetchContent_Declare(mcap
     GIT_REPOSITORY https://github.com/foxglove/mcap.git
     GIT_TAG        releases/cpp/v2.1.3
     GIT_SHALLOW    TRUE
-    EXCLUDE_FROM_ALL  # header-only, no CMakeLists.txt
+    EXCLUDE_FROM_ALL
 )
-FetchContent_MakeAvailable(eigen yaml-cpp mcap)
+FetchContent_MakeAvailable(eigen mcap)
 
 add_executable(cal_viz
     src/main.cpp
+    src/stb_impl.cpp
     src/bag/mcap_reader.cpp
-    src/bag/ros1_reader.cpp
-    src/bag/factory.cpp
     src/msgs/deserialize.cpp
     src/tf/tf_buffer.cpp
-    src/discovery.cpp
-    src/projection.cpp
-    src/colorize.cpp
-    src/pcd_writer.cpp
+    src/projection/project.cpp
     src/commands/unbag.cpp
     src/commands/project.cpp
 )
 
 target_include_directories(cal_viz PRIVATE src third_party ${mcap_SOURCE_DIR}/cpp/mcap/include)
-target_compile_definitions(cal_viz PRIVATE MCAP_COMPRESSION_NO_LZ4 MCAP_COMPRESSION_NO_ZSTD)
-target_link_libraries(cal_viz PRIVATE Eigen3::Eigen yaml-cpp::yaml-cpp)
+target_compile_definitions(cal_viz PRIVATE MCAP_COMPRESSION_NO_LZ4)
+target_link_libraries(cal_viz PRIVATE Eigen3::Eigen zstd)
 ```
 
 ---
@@ -87,22 +73,22 @@ target_link_libraries(cal_viz PRIVATE Eigen3::Eigen yaml-cpp::yaml-cpp)
 src/
 ├── bag/
 │   ├── bag_reader.hpp        # abstract BagReader interface + RawMessage
-│   ├── mcap_reader.hpp/.cpp  # MCAP format implementation
-│   ├── ros1_reader.hpp/.cpp  # ROS1 .bag format implementation
-│   └── factory.hpp/.cpp      # make_reader() — detects format from magic bytes
+│   └── mcap_reader.hpp/.cpp  # MCAP format implementation
 ├── msgs/
 │   ├── types.hpp             # all internal message structs
 │   └── deserialize.hpp/.cpp  # ROS CDR → internal struct converters
 ├── tf/
-│   └── tf_buffer.hpp/.cpp    # TF tree storage + interpolation
-├── discovery.hpp/.cpp        # topic scan, type classification, pair matching
-├── projection.hpp/.cpp       # SE3 transform + camera projection math
-├── colorize.hpp/.cpp         # depth/intensity/doppler/height/ring → RGB
-├── pcd_writer.hpp/.cpp       # binary PCD serialization (no lib)
+│   └── tf_buffer.hpp/.cpp    # TF tree storage + BFS lookup + slerp interpolation
+├── projection/
+│   └── project.hpp/.cpp      # SE3 transform + camera projection + colorization
+├── pcd/
+│   └── pcd_writer.hpp        # ASCII PCD serialization (header-only)
 ├── commands/
+│   ├── args.hpp              # minimal flag parser
 │   ├── unbag.hpp/.cpp        # unbag subcommand
 │   └── project.hpp/.cpp      # project subcommand
-└── main.cpp
+├── stb_impl.cpp              # single TU that defines STB_IMAGE_IMPLEMENTATION
+└── main.cpp                  # subcommand dispatcher
 ```
 
 ---
@@ -110,15 +96,15 @@ src/
 ### Bag Reader Abstraction
 
 The reader layer hides format differences behind a single pull-style interface.
-Callers never see MCAP chunks or ROS1 index records — only `RawMessage`.
+Callers never see MCAP chunks or index records — only `RawMessage`.
 
 ```cpp
 struct RawMessage {
-    std::string  topic;
-    std::string  msg_type;      // e.g. "sensor_msgs/PointCloud2"
-    uint64_t     log_time_ns;
-    uint64_t     publish_time_ns;
-    std::vector<uint8_t> data;  // serialized ROS CDR bytes
+    std::string          topic;
+    std::string          msg_type;        // e.g. "sensor_msgs/PointCloud2"
+    uint64_t             log_time_ns;
+    uint64_t             publish_time_ns;
+    std::vector<uint8_t> data;            // serialized ROS CDR bytes
 };
 
 struct TopicInfo {
@@ -130,24 +116,11 @@ struct TopicInfo {
 class BagReader {
 public:
     virtual ~BagReader() = default;
-
-    // Returns metadata for all topics without reading message data.
     virtual std::vector<TopicInfo> topics() = 0;
-
-    // Advances to the next message. Returns false when exhausted.
     virtual bool next(RawMessage& out) = 0;
-
-    // Seek back to the start (used during pair validation sampling).
     virtual void rewind() = 0;
 };
 ```
-
-`factory.hpp` reads the first few bytes of the file and returns the right subclass:
-
-| Magic bytes | Format |
-|---|---|
-| `\x89MCAP0\r\n` (8 bytes) | MCAP |
-| `#ROSBAG V2.0\n` (13 bytes) | ROS1 bag |
 
 ---
 
@@ -159,85 +132,50 @@ convert raw CDR bytes from `RawMessage::data` into these structs.
 #### Common header
 
 ```cpp
-struct Header {
-    uint64_t    stamp_ns;
+struct BaseType {
+    Timestamp   timestamp;  // { int32_t sec, uint32_t nsec }
     std::string frame_id;
 };
 ```
 
-#### Point cloud (LiDAR and radar)
-
-Both LiDAR and radar use `sensor_msgs/PointCloud2`. Radar is distinguished at
-the field level — it carries a `doppler` field; LiDAR does not. There is no
-separate radar struct.
+#### Point cloud
 
 ```cpp
-struct PointField {
-    std::string name;
-    uint32_t    offset;    // byte offset within a single point record
-    uint8_t     datatype;  // matches ROS constants: FLOAT32=7, FLOAT64=8, …
-    uint32_t    count;
+struct Point {
+    float x, y, z;
+    float intensity;  // NaN if the source cloud has no intensity field
 };
 
-struct PointCloud {
-    Header                  header;
-    uint32_t                height;
-    uint32_t                width;
-    std::vector<PointField> fields;
-    bool                    is_bigendian;
-    uint32_t                point_step;  // bytes per point
-    uint32_t                row_step;    // bytes per row (= width * point_step)
-    std::vector<uint8_t>    data;
-    bool                    is_dense;
-
-    // Convenience accessors — look up field offset at construction time.
-    size_t num_points() const { return height * width; }
-    float  field_f32(size_t point_idx, const std::string& field_name) const;
-    bool   has_field(const std::string& name) const;
-    bool   is_radar() const { return has_field("doppler"); }
+struct PointCloud : BaseType {
+    std::vector<Point> points;
 };
 ```
 
-#### Image (raw)
+#### Image
+
+Decoded pixel buffer — always RGB8 (3 bytes per pixel, row-major).
+The deserializer handles decoding from both raw (`sensor_msgs/Image`) and
+compressed (`sensor_msgs/CompressedImage`) formats via stb_image.
 
 ```cpp
-struct Image {
-    Header               header;
+struct Image : BaseType {
     uint32_t             height;
     uint32_t             width;
-    std::string          encoding;  // "rgb8", "bgr8", "mono8", "16UC1", …
-    bool                 is_bigendian;
-    uint32_t             step;      // bytes per row
-    std::vector<uint8_t> data;
+    std::vector<uint8_t> data;  // height * width * 3 bytes
 };
 ```
-
-#### Compressed image
-
-```cpp
-struct CompressedImage {
-    Header               header;
-    std::string          format;  // "jpeg" | "png"
-    std::vector<uint8_t> data;
-};
-```
-
-Projection always works on a decoded pixel buffer. `CompressedImage` is decoded
-to `Image` (via libjpeg-turbo / libpng stubs, or a minimal JFIF decoder) before
-entering the projection pipeline.
 
 #### Camera intrinsics
 
 ```cpp
-struct CameraInfo {
-    Header               header;
-    uint32_t             height;
-    uint32_t             width;
-    std::string          distortion_model;  // "plumb_bob" | "equidistant"
-    std::vector<double>  D;                 // distortion coefficients (length varies)
-    std::array<double,9>  K;               // 3×3 intrinsic matrix (row-major)
-    std::array<double,9>  R;               // 3×3 rectification matrix
-    std::array<double,12> P;              // 3×4 projection matrix
+struct CameraInfo : BaseType {
+    uint32_t               height;
+    uint32_t               width;
+    std::string            distortion_model;  // "plumb_bob" | "equidistant"
+    std::vector<double>    D;                 // distortion coefficients
+    std::array<double, 9>  K;                 // 3×3 intrinsic matrix (row-major)
+    std::array<double, 9>  R;                 // 3×3 rectification matrix
+    std::array<double, 12> P;                 // 3×4 projection matrix
 };
 ```
 
@@ -246,22 +184,12 @@ struct CameraInfo {
 ### TF Storage
 
 TF data arrives as a stream of `tf2_msgs/TFMessage` messages on `/tf` and
-`/tf_static`. Each message contains one or more `geometry_msgs/TransformStamped`
-records. Static transforms are stored once and never expire; dynamic transforms
-are buffered as time-sorted sequences and interpolated on lookup.
+`/tf_static`. Static transforms are stored once; dynamic transforms are
+buffered as time-sorted sequences and interpolated on lookup.
 
 #### Primitives
 
 ```cpp
-struct Vec3 {
-    double x, y, z;
-};
-
-struct Quat {
-    double x, y, z, w;
-};
-
-// A single SE3 transform: p_parent = R * p_child + t
 struct Transform {
     Vec3 translation;
     Quat rotation;
@@ -275,151 +203,94 @@ struct StampedTransform {
 };
 ```
 
+The stored transform follows the ROS TF convention:
+`p_parent = R * p_child + t`
+
 #### TfBuffer
-
-The buffer maintains one `std::map` keyed by `(parent_frame, child_frame)`.
-Each entry holds a `std::vector<StampedTransform>` sorted by `stamp_ns`.
-
-`lookup()` finds the path between two arbitrary frames by BFS over the frame
-graph, then chains the per-edge transforms together. Edge transforms are
-interpolated at the requested timestamp using `lerp` for translation and `slerp`
-for rotation.
 
 ```cpp
 class TfBuffer {
 public:
     void add_dynamic(const StampedTransform& tf);
-    void add_static(const StampedTransform& tf);  // stored at stamp=0, never expires
+    void add_static(const StampedTransform& tf);
 
-    // Returns the transform that maps a point in `from_frame` to `to_frame`
-    // at the given timestamp. Returns nullopt if no path exists or the
-    // timestamp is out of range.
+    // Returns the transform mapping a point FROM from_frame TO to_frame.
     std::optional<Transform> lookup(
         const std::string& from_frame,
         const std::string& to_frame,
         uint64_t           stamp_ns
     ) const;
 
-    bool can_transform(const std::string& from_frame, const std::string& to_frame) const;
+    bool can_transform(const std::string& from, const std::string& to) const;
+    std::vector<std::string> frames() const;
 
 private:
-    // edge key: {parent, child}
     using EdgeKey = std::pair<std::string, std::string>;
+    std::map<EdgeKey, StampedTransform>              static_;
     std::map<EdgeKey, std::vector<StampedTransform>> dynamic_;
-    std::map<EdgeKey, StampedTransform>               static_;
-
-    std::optional<std::vector<EdgeKey>> bfs_path(
-        const std::string& from, const std::string& to) const;
-
-    Transform interpolate(const std::vector<StampedTransform>& seq, uint64_t t) const;
-    Transform chain(const std::vector<Transform>& transforms) const;
 };
 ```
 
----
+`lookup()` finds the path between two frames by BFS over the undirected frame
+graph, then chains the per-edge transforms. Key lookup direction rule:
 
-### Topic Discovery
-
-```cpp
-enum class SensorType { LiDAR, Camera, CompressedCamera, CameraInfo, TF, TFStatic, Unknown };
-
-// Classify a msg_type string into a SensorType.
-SensorType classify(const std::string& msg_type);
-
-// A camera image topic paired with its CameraInfo topic.
-struct CameraSource {
-    std::string  image_topic;
-    std::string  camera_info_topic;  // matched by naming convention or frame_id
-    SensorType   image_type;         // Camera or CompressedCamera
-};
-
-// A validated LiDAR × camera pair ready for projection.
-struct ProjectionPair {
-    std::string  lidar_topic;
-    CameraSource camera;
-    float        overlap_pct;     // measured during validation sampling
-};
-
-struct DiscoveryResult {
-    std::vector<std::string>     lidar_topics;
-    std::vector<CameraSource>    camera_sources;
-    std::vector<ProjectionPair>  valid_pairs;
-    std::vector<std::string>     warnings;  // skipped pairs with reasons
-};
-
-DiscoveryResult discover(BagReader& reader, const TfBuffer& tf, float overlap_threshold);
-```
-
-CameraInfo matching order:
-1. Replace `image`/`color` with `camera_info` in the topic name.
-2. Strip the last path component and append `camera_info`.
-3. Match on `frame_id` from the first message on each candidate topic.
+- `static_[{P, C}]` maps FROM child C TO parent P (`p_P = R * p_C + t`)
+- For a BFS edge `a → b`: if we find key `{a, b}` we take its **inverse**;
+  if we find key `{b, a}` we use it **directly**.
 
 ---
 
 ### Projection Pipeline
 
 ```cpp
-// A single LiDAR point projected into image space.
 struct ProjectedPoint {
-    int     u, v;       // pixel coordinates
-    float   depth;      // distance from camera origin (metres)
-    float   intensity;  // raw LiDAR return strength (NaN if unavailable)
-    float   doppler;    // m/s, positive = receding (NaN if not radar)
-    float   height;     // Z in world frame (metres)
-    int32_t ring;       // beam/ring ID (-1 if unavailable)
+    int   u, v;      // pixel coordinates
+    float depth;     // distance from camera origin (metres)
+    float intensity; // raw LiDAR return (NaN if unavailable)
 };
 
-// Projects all points in `cloud` into the image plane defined by `cam_info`,
-// using `lidar_to_cam` as the extrinsic SE3 transform.
-// Points behind the camera or outside [0,W)×[0,H) are dropped.
+enum class ColorizeMode { Depth, Intensity };
+
 std::vector<ProjectedPoint> project(
-    const PointCloud&  cloud,
-    const Transform&   lidar_to_cam,
-    const CameraInfo&  cam_info
+    const msgs::PointCloud& cloud,
+    const Transform&        lidar_to_cam,
+    const msgs::CameraInfo& cam_info
 );
+
+std::array<uint8_t, 3> colorize(const ProjectedPoint& pt, ColorizeMode mode,
+                                 float range_min, float range_max);
+
+void render(msgs::Image& image, const std::vector<ProjectedPoint>& points,
+            ColorizeMode mode, int dot_radius = 2);
 ```
 
-Distortion is applied after the linear projection. Two models are supported,
-selected via `CameraInfo::distortion_model`:
+Distortion is applied after the linear projection:
 
-- `plumb_bob` — pinhole + radial-tangential (`k1,k2,p1,p2,k3`)
-- `equidistant` — fisheye (`k1,k2,k3,k4`)
+- `plumb_bob` — pinhole + radial-tangential (`k1, k2, p1, p2, k3`)
+- `equidistant` — fisheye (`k1, k2, k3, k4`)
 
----
-
-### Colorization
-
-```cpp
-enum class ColorizeMode { Depth, Intensity, Doppler, Height, Ring };
-
-// Maps a single ProjectedPoint scalar to an RGB triple using a fixed colormap.
-// `range` is the [min, max] used for normalisation (computed per-frame).
-std::array<uint8_t,3> colorize(const ProjectedPoint& pt, ColorizeMode mode,
-                               float range_min, float range_max);
-```
+If all D coefficients are zero, the 3×4 P matrix is used directly (rectified image path).
 
 Colormaps:
-- **Depth / Height / Ring** — Turbo (perceptually uniform, works for both)
+- **Depth** — Turbo rainbow (red = near, blue = far)
 - **Intensity** — Grayscale
-- **Doppler** — Diverging blue→white→red (zero = white)
 
 ---
 
 ### PCD Writer
 
-Binary PCD (little-endian) is written without any external library.
+ASCII PCD v0.7 is written without any external library (`pcd/pcd_writer.hpp`, header-only).
 
 ```cpp
-void write_pcd(const PointCloud& cloud, const std::string& path);
+void pcd::write(const msgs::PointCloud& cloud, const std::filesystem::path& path);
 ```
 
-The file header is generated from `PointCloud::fields`. Only `FLOAT32` and
-`FLOAT64` field types are written; integer fields are cast to `FLOAT32`.
+Points with non-finite x/y/z are skipped. NaN intensity is written as 0.
+The header is generated in a single pass after counting valid points.
 
 ---
 
-### Data Flow Summary
+### Data Flow
 
 ```
 BagReader::next()
@@ -429,19 +300,19 @@ BagReader::next()
     └─ sensor topics
            │
            ├─ [unbag command]
-           │      ├─ PointCloud ──► write_pcd()
-           │      └─ Image / CompressedImage ──► write jpg
+           │      ├─ PointCloud2 ──► pcd::write()
+           │      └─ Image / CompressedImage ──► stbi_write_jpg()
            │
            └─ [project command]
                   │
-                  ├─ discover() ──► valid ProjectionPairs
+                  ├─ pass 1: collect TF + CameraInfo + PointClouds
                   │
-                  └─ per pair, per frame:
-                         TfBuffer::lookup()
+                  └─ pass 2: per image frame
+                         TfBuffer::lookup(cloud.frame_id, image.frame_id)
                              │
-                         project()
+                         projection::project()
                              │
-                         colorize()
+                         projection::render()
                              │
-                         render overlay ──► write jpg
+                         stbi_write_jpg()
 ```
