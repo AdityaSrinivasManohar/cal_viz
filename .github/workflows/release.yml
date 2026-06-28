@@ -1,0 +1,88 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: linux-x86_64
+          - os: ubuntu-24.04-arm
+            target: linux-arm64
+          - os: macos-15
+            target: macos-arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          wget -qO /etc/apt/trusted.gpg.d/apt.llvm.org.asc https://apt.llvm.org/llvm-snapshot.gpg.key
+          echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-22 main" \
+            | sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update
+          sudo apt-get install -y clang-22 libzstd-dev
+
+      - name: Install CMake 4.3.3 (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          ARCH=$(uname -m)
+          curl -fsSL https://github.com/Kitware/CMake/releases/download/v4.3.3/cmake-4.3.3-linux-${ARCH}.sh \
+            -o /tmp/cmake.sh
+          sudo sh /tmp/cmake.sh --prefix=/usr/local --skip-license
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install cmake zstd
+
+      - name: Configure (Linux)
+        if: runner.os == 'Linux'
+        run: cmake -B build -DCMAKE_CXX_COMPILER=clang++-22 -DCMAKE_BUILD_TYPE=Release
+
+      - name: Configure (macOS)
+        if: runner.os == 'macOS'
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Strip binary
+        run: strip build/cal_viz
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cal_viz-${{ matrix.target }}
+          path: build/cal_viz
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          for dir in artifacts/*/; do
+            target=$(basename "$dir")
+            mv "$dir/cal_viz" "cal_viz-${target}"
+          done
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: cal_viz-*
+          generate_release_notes: true
