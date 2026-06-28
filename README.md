@@ -2,6 +2,8 @@
 
 Projects LiDAR point clouds onto camera images from `.mcap` files.
 
+![example projection](docs/example_image.jpg)
+
 ## Commands
 
 ### `unbag` — extract raw sensor data

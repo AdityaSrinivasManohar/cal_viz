@@ -5,3 +5,4 @@ out/
 .cache
 *.jpg
 *.pcd
+!docs/example_image.jpg
