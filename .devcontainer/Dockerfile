@@ -1,6 +1,5 @@
-# Multi-arch image; we force arm64 so it runs natively on Apple Silicon
-# (no x86 emulation via Rosetta/QEMU).
-FROM --platform=linux/arm64 mcr.microsoft.com/devcontainers/cpp:debian
+FROM mcr.microsoft.com/devcontainers/cpp:debian
+ARG TARGETARCH
 
 # Toolchain: install clang 22 (newest LLVM release; clang 23 is not released yet)
 # from the official LLVM apt repo. The repo is added by hand because trixie has
@@ -17,13 +16,15 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && ln -sf /usr/bin/clangd-22       /usr/local/bin/clangd \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install CMake 4.3.3 from Kitware's pre-built aarch64 binary
-RUN curl -fsSL https://github.com/Kitware/CMake/releases/download/v4.3.3/cmake-4.3.3-linux-aarch64.sh \
+# Install CMake 4.3.3 from Kitware's pre-built binary.
+# CMake uses "aarch64"/"x86_64"; Docker TARGETARCH uses "arm64"/"amd64".
+RUN CMAKE_ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "aarch64" || echo "x86_64") \
+ && curl -fsSL https://github.com/Kitware/CMake/releases/download/v4.3.3/cmake-4.3.3-linux-${CMAKE_ARCH}.sh \
       -o /tmp/cmake.sh \
  && sh /tmp/cmake.sh --prefix=/usr/local --skip-license \
  && rm /tmp/cmake.sh
 
-# Install mcap CLI
-RUN curl -fsSL https://github.com/foxglove/mcap/releases/latest/download/mcap-linux-arm64 \
+# Install mcap CLI (TARGETARCH matches mcap's naming: arm64/amd64)
+RUN curl -fsSL https://github.com/foxglove/mcap/releases/latest/download/mcap-linux-${TARGETARCH} \
       -o /usr/local/bin/mcap \
     && chmod +x /usr/local/bin/mcap
