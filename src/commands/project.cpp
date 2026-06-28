@@ -22,7 +22,7 @@ static void print_help() {
                  "  --input       <file>       bag file to read (required)\n"
                  "  --output      <dir>        output directory (default: out)\n"
                  "  --colorize    <mode>       depth | intensity  (default: depth)\n"
-                 "  --point-size  <px>         dot radius in pixels (default: 2)\n"
+                 "  --pointsize   <px>         dot radius in pixels (default: 2)\n"
                  "  --lidar       <topic>      pin to a specific LiDAR topic\n"
                  "  --camera      <topic>      pin to a specific camera topic\n"
                  "  --help                     show this message\n";
@@ -72,7 +72,7 @@ int project(int argc, char** argv) {
         output = args.get("output", "out");
         lidar_pin = args.get("lidar");
         camera_pin = args.get("camera");
-        dot_radius = args.get_int("point-size", 2);
+        dot_radius = args.get_int("pointsize", 2);
 
         std::string colorize_str = args.get("colorize", "depth");
         if (colorize_str == "depth")

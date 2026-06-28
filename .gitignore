@@ -1,5 +1,7 @@
-build
-data
-
+build/
+data/
+out/
 .DS_Store
 .cache
+*.jpg
+*.pcd

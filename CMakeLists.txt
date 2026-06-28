@@ -20,18 +20,13 @@ FetchContent_Declare(eigen
     GIT_TAG        5.0.1
     GIT_SHALLOW    TRUE
 )
-FetchContent_Declare(yaml-cpp
-    GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
-    GIT_TAG        0.8.0
-    GIT_SHALLOW    TRUE
-)
 FetchContent_Declare(mcap
     GIT_REPOSITORY https://github.com/foxglove/mcap.git
     GIT_TAG        releases/cpp/v2.1.3
     GIT_SHALLOW    TRUE
     EXCLUDE_FROM_ALL  # header-only, no CMakeLists.txt — skip add_subdirectory
 )
-FetchContent_MakeAvailable(eigen yaml-cpp mcap)
+FetchContent_MakeAvailable(eigen mcap)
 
 add_executable(cal_viz
     src/main.cpp
@@ -46,4 +41,4 @@ add_executable(cal_viz
 
 target_include_directories(cal_viz PRIVATE src third_party ${mcap_SOURCE_DIR}/cpp/mcap/include)
 target_compile_definitions(cal_viz PRIVATE MCAP_COMPRESSION_NO_LZ4)
-target_link_libraries(cal_viz PRIVATE Eigen3::Eigen yaml-cpp::yaml-cpp zstd)
+target_link_libraries(cal_viz PRIVATE Eigen3::Eigen zstd)

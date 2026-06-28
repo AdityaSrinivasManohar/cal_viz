@@ -38,7 +38,7 @@ cal_viz project \
   --input      drive.mcap \
   --output     ./out      \
   --colorize   depth      \
-  --point-size 3          \
+  --pointsize 3          \
   --lidar      /lidar_front \
   --camera     /cam_front
 ```
@@ -50,7 +50,7 @@ Options:
 | `--input` | required | bag file to read |
 | `--output` | `out` | output directory |
 | `--colorize` | `depth` | `depth` or `intensity` |
-| `--point-size` | `2` | dot radius in pixels |
+| `--pointsize` | `2` | dot radius in pixels |
 | `--lidar` | _(all)_ | pin to a specific LiDAR topic |
 | `--camera` | _(all)_ | pin to a specific camera topic |
 

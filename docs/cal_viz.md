@@ -65,7 +65,7 @@ cal_viz project \
   --input      drive.mcap  \
   --output     ./out        \
   --colorize   depth        \   # depth | intensity  (default: depth)
-  --point-size 2            \   # dot radius in pixels  (default: 2)
+  --pointsize  2            \   # dot radius in pixels  (default: 2)
   --lidar      /lidar_front \   # optional: pin to a specific topic
   --camera     /cam_front       # optional: pin to a specific topic
 ```
