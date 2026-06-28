@@ -27,22 +27,18 @@ struct Args {
         return a;
     }
 
-    bool has(const std::string& key) const { return flags.count(key) > 0; }
+    bool has(const std::string& key) const { return flags.contains(key); }
 
-    std::string get(const std::string& key, const std::string& def = "") const {
-        auto it = flags.find(key);
-        return it == flags.end() ? def : it->second;
+    std::string get(const std::string& key, const std::string& defaults = "") const {
+        return flags.contains(key) ? flags.at(key) : defaults;
     }
 
     std::string require(const std::string& key) const {
-        auto it = flags.find(key);
-        if (it == flags.end())
-            throw std::runtime_error("missing required flag --" + key);
-        return it->second;
+        if (!flags.contains(key)) throw std::runtime_error("missing required flag --" + key);
+        return flags.at(key);
     }
 
-    int get_int(const std::string& key, int def) const {
-        auto it = flags.find(key);
-        return it == flags.end() ? def : std::stoi(it->second);
+    int get_int(const std::string& key, int defaults) const {
+        return flags.contains(key) ? std::stoi(flags.at(key)) : defaults;
     }
 };

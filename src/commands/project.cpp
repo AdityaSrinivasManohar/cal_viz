@@ -1,6 +1,6 @@
-#include <stb/stb_image_write.h>
-
 #include "commands/project.hpp"
+
+#include <stb/stb_image_write.h>
 
 #include <filesystem>
 #include <iomanip>
@@ -16,24 +16,35 @@
 namespace fs = std::filesystem;
 
 static void print_help() {
-    std::cout <<
-        "usage: cal_viz project --input <file> [options]\n\n"
-        "Project LiDAR point clouds onto camera images.\n\n"
-        "options:\n"
-        "  --input       <file>       bag file to read (required)\n"
-        "  --output      <dir>        output directory (default: out)\n"
-        "  --colorize    <mode>       depth | intensity  (default: depth)\n"
-        "  --point-size  <px>         dot radius in pixels (default: 2)\n"
-        "  --lidar       <topic>      pin to a specific LiDAR topic\n"
-        "  --camera      <topic>      pin to a specific camera topic\n"
-        "  --help                     show this message\n";
+    std::cout << "usage: cal_viz project --input <file> [options]\n\n"
+                 "Project LiDAR point clouds onto camera images.\n\n"
+                 "options:\n"
+                 "  --input       <file>       bag file to read (required)\n"
+                 "  --output      <dir>        output directory (default: out)\n"
+                 "  --colorize    <mode>       depth | intensity  (default: depth)\n"
+                 "  --point-size  <px>         dot radius in pixels (default: 2)\n"
+                 "  --lidar       <topic>      pin to a specific LiDAR topic\n"
+                 "  --camera      <topic>      pin to a specific camera topic\n"
+                 "  --help                     show this message\n";
 }
 
-// Derives the camera_info topic from an image topic by replacing the last
-// path segment with "camera_info".
 static std::string image_to_info_topic(const std::string& topic) {
     auto pos = topic.rfind('/');
     return pos == std::string::npos ? topic : topic.substr(0, pos + 1) + "camera_info";
+}
+
+// Returns the meaningful short name of a ROS topic for use in output paths.
+// /kitti/velodyne_points           → velodyne_points
+// /kitti/camera_color_left/image_raw → camera_color_left  (strips image_* suffix)
+static std::string topic_short_name(const std::string& topic) {
+    std::string t = topic.front() == '/' ? topic.substr(1) : topic;
+    auto last  = t.rfind('/');
+    std::string tail = last == std::string::npos ? t : t.substr(last + 1);
+    if (tail.starts_with("image") && last != std::string::npos) {
+        auto parent = t.rfind('/', last - 1);
+        return parent == std::string::npos ? t.substr(0, last) : t.substr(parent + 1, last - parent - 1);
+    }
+    return tail;
 }
 
 namespace commands {
@@ -48,17 +59,20 @@ int project(int argc, char** argv) {
         return 1;
     }
 
-    if (args.has("help")) { print_help(); return 0; }
+    if (args.has("help")) {
+        print_help();
+        return 0;
+    }
 
-    std::string input, output, lidar_pin, camera_pin;
-    int         dot_radius;
+    std::string              input, output, lidar_pin, camera_pin;
+    int                      dot_radius;
     projection::ColorizeMode colorize_mode;
     try {
-        input       = args.require("input");
-        output      = args.get("output", "out");
-        lidar_pin   = args.get("lidar");
-        camera_pin  = args.get("camera");
-        dot_radius  = args.get_int("point-size", 2);
+        input = args.require("input");
+        output = args.get("output", "out");
+        lidar_pin = args.get("lidar");
+        camera_pin = args.get("camera");
+        dot_radius = args.get_int("point-size", 2);
 
         std::string colorize_str = args.get("colorize", "depth");
         if (colorize_str == "depth")
@@ -80,22 +94,20 @@ int project(int argc, char** argv) {
 
     // ── topic summary ─────────────────────────────────────────────────────────
     auto topics = reader.topics();
-    std::sort(topics.begin(), topics.end(),
-              [](const TopicInfo& a, const TopicInfo& b) {
-                  return a.message_count > b.message_count;
-              });
+    std::sort(topics.begin(), topics.end(), [](const TopicInfo& a, const TopicInfo& b) {
+        return a.message_count > b.message_count;
+    });
 
     std::cout << "\ntopics in " << input << ":\n\n" << std::left;
     for (const auto& t : topics)
-        std::cout << "  " << std::setw(8) << t.message_count
-                  << std::setw(50) << t.topic
+        std::cout << "  " << std::setw(8) << t.message_count << std::setw(50) << t.topic
                   << t.msg_type << "\n";
     std::cout << "\n";
 
     // ── pass 1: collect TF, CameraInfo, and PointClouds ──────────────────────
-    TfBuffer                                tf;
-    std::map<std::string, msgs::CameraInfo> cam_infos;   // info_topic → CameraInfo
-    std::map<uint64_t, msgs::PointCloud>    clouds;      // log_time_ns → PointCloud
+    TfBuffer                                           tf;
+    std::map<std::string, msgs::CameraInfo>            cam_infos;  // info_topic → CameraInfo
+    std::map<uint64_t, std::pair<std::string, msgs::PointCloud>> clouds;  // log_time_ns → {topic, cloud}
 
     RawMessage msg;
     while (reader.next(msg)) {
@@ -110,13 +122,12 @@ int project(int argc, char** argv) {
                 std::string expected_info = image_to_info_topic(camera_pin);
                 if (msg.topic != expected_info) continue;
             }
-            if (auto info = msgs::as_camera_info(msg))
-                cam_infos[msg.topic] = std::move(*info);
+            if (auto info = msgs::as_camera_info(msg)) cam_infos[msg.topic] = std::move(*info);
 
         } else if (msg.msg_type.ends_with("PointCloud2")) {
             if (!lidar_pin.empty() && msg.topic != lidar_pin) continue;
             if (auto cloud = msgs::as_point_cloud(msg))
-                clouds[msg.log_time_ns] = std::move(*cloud);
+                clouds[msg.log_time_ns] = {msg.topic, std::move(*cloud)};
         }
     }
 
@@ -135,28 +146,31 @@ int project(int argc, char** argv) {
     // ── pass 2: project and save ──────────────────────────────────────────────
     reader.rewind();
 
-    uint64_t images_saved  = 0;
+    uint64_t images_saved = 0;
     uint64_t images_failed = 0;
-    uint64_t projected     = 0;
+    uint64_t projected = 0;
 
     while (reader.next(msg)) {
-        bool is_image = msg.msg_type.ends_with("Image") ||
-                        msg.msg_type.ends_with("CompressedImage");
+        bool is_image =
+            msg.msg_type.ends_with("Image") || msg.msg_type.ends_with("CompressedImage");
         if (!is_image) continue;
         if (!camera_pin.empty() && msg.topic != camera_pin) continue;
 
         auto img = msgs::as_image(msg);
-        if (!img) { ++images_failed; continue; }
+        if (!img) {
+            ++images_failed;
+            continue;
+        }
 
         // Nearest cloud by log timestamp.
         auto it = clouds.lower_bound(msg.log_time_ns);
-        if (it == clouds.end()) --it;
+        if (it == clouds.end())
+            --it;
         else if (it != clouds.begin()) {
             auto prev = std::prev(it);
-            if (msg.log_time_ns - prev->first < it->first - msg.log_time_ns)
-                it = prev;
+            if (msg.log_time_ns - prev->first < it->first - msg.log_time_ns) it = prev;
         }
-        const msgs::PointCloud& cloud = it->second;
+        const auto& [lidar_topic, cloud] = it->second;
 
         auto tf_result = tf.lookup(cloud.frame_id, img->frame_id, msg.log_time_ns);
         if (tf_result) {
@@ -168,21 +182,18 @@ int project(int argc, char** argv) {
             }
         }
 
-        std::string rel      = msg.topic.front() == '/' ? msg.topic.substr(1) : msg.topic;
-        fs::path    out_path = fs::path(output) / rel / (std::to_string(msg.log_time_ns) + ".jpg");
+        std::string pair_dir = topic_short_name(lidar_topic) + "__" + topic_short_name(msg.topic);
+        fs::path    out_path = fs::path(output) / pair_dir / (std::to_string(msg.log_time_ns) + ".jpg");
         fs::create_directories(out_path.parent_path());
 
-        int ok = stbi_write_jpg(out_path.string().c_str(),
-                                static_cast<int>(img->width),
-                                static_cast<int>(img->height),
-                                3, img->data.data(), 90);
+        int ok = stbi_write_jpg(out_path.string().c_str(), static_cast<int>(img->width),
+                                static_cast<int>(img->height), 3, img->data.data(), 90);
         ok ? ++images_saved : ++images_failed;
     }
 
     std::cout << "images saved:     " << images_saved << "\n"
-              << "images projected: " << projected    << "\n";
-    if (images_failed)
-        std::cout << "images failed:    " << images_failed << "\n";
+              << "images projected: " << projected << "\n";
+    if (images_failed) std::cout << "images failed:    " << images_failed << "\n";
     std::cout << "output: " << output << "\n";
 
     return 0;
