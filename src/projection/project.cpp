@@ -16,16 +16,24 @@ std::array<uint8_t, 3> turbo(float t) {
     float r, g, b;
     if (t < 0.25f) {
         float s = t / 0.25f;
-        r = 0.f; g = s; b = 1.f;
+        r = 0.f;
+        g = s;
+        b = 1.f;
     } else if (t < 0.5f) {
         float s = (t - 0.25f) / 0.25f;
-        r = 0.f; g = 1.f; b = 1.f - s;
+        r = 0.f;
+        g = 1.f;
+        b = 1.f - s;
     } else if (t < 0.75f) {
         float s = (t - 0.5f) / 0.25f;
-        r = s; g = 1.f; b = 0.f;
+        r = s;
+        g = 1.f;
+        b = 0.f;
     } else {
         float s = (t - 0.75f) / 0.25f;
-        r = 1.f; g = 1.f - s; b = 0.f;
+        r = 1.f;
+        g = 1.f - s;
+        b = 0.f;
     }
     return {static_cast<uint8_t>(r * 255), static_cast<uint8_t>(g * 255),
             static_cast<uint8_t>(b * 255)};
@@ -34,24 +42,22 @@ std::array<uint8_t, 3> turbo(float t) {
 // ── distortion ────────────────────────────────────────────────────────────────
 
 // Returns (x'', y'') after applying plumb_bob distortion to normalised (x', y').
-std::pair<double, double> distort_plumb_bob(double xp, double yp,
-                                            const std::vector<double>& D) {
+std::pair<double, double> distort_plumb_bob(double xp, double yp, const std::vector<double>& D) {
     double k1 = D.size() > 0 ? D[0] : 0;
     double k2 = D.size() > 1 ? D[1] : 0;
     double p1 = D.size() > 2 ? D[2] : 0;
     double p2 = D.size() > 3 ? D[3] : 0;
     double k3 = D.size() > 4 ? D[4] : 0;
 
-    double r2    = xp * xp + yp * yp;
+    double r2 = xp * xp + yp * yp;
     double scale = 1 + k1 * r2 + k2 * r2 * r2 + k3 * r2 * r2 * r2;
-    double xpp   = xp * scale + 2 * p1 * xp * yp + p2 * (r2 + 2 * xp * xp);
-    double ypp   = yp * scale + p1 * (r2 + 2 * yp * yp) + 2 * p2 * xp * yp;
+    double xpp = xp * scale + 2 * p1 * xp * yp + p2 * (r2 + 2 * xp * xp);
+    double ypp = yp * scale + p1 * (r2 + 2 * yp * yp) + 2 * p2 * xp * yp;
     return {xpp, ypp};
 }
 
 // Returns (x'', y'') after applying equidistant (fisheye) distortion.
-std::pair<double, double> distort_equidistant(double xp, double yp,
-                                              const std::vector<double>& D) {
+std::pair<double, double> distort_equidistant(double xp, double yp, const std::vector<double>& D) {
     double k1 = D.size() > 0 ? D[0] : 0;
     double k2 = D.size() > 1 ? D[1] : 0;
     double k3 = D.size() > 2 ? D[2] : 0;
@@ -60,11 +66,10 @@ std::pair<double, double> distort_equidistant(double xp, double yp,
     double r = std::sqrt(xp * xp + yp * yp);
     if (r < 1e-9) return {xp, yp};
 
-    double theta  = std::atan(r);
+    double theta = std::atan(r);
     double theta2 = theta * theta;
-    double td     = theta * (1 + k1 * theta2 + k2 * theta2 * theta2 +
-                            k3 * theta2 * theta2 * theta2 +
-                            k4 * theta2 * theta2 * theta2 * theta2);
+    double td = theta * (1 + k1 * theta2 + k2 * theta2 * theta2 + k3 * theta2 * theta2 * theta2 +
+                         k4 * theta2 * theta2 * theta2 * theta2);
     double scale = td / r;
     return {xp * scale, yp * scale};
 }
@@ -73,20 +78,19 @@ std::pair<double, double> distort_equidistant(double xp, double yp,
 
 // ── public API ────────────────────────────────────────────────────────────────
 
-std::vector<ProjectedPoint> project(const msgs::PointCloud& cloud,
-                                    const Transform&        lidar_to_cam,
+std::vector<ProjectedPoint> project(const msgs::PointCloud& cloud, const Transform& lidar_to_cam,
                                     const msgs::CameraInfo& cam_info) {
-    Eigen::Quaterniond q(lidar_to_cam.rotation.w, lidar_to_cam.rotation.x,
-                         lidar_to_cam.rotation.y, lidar_to_cam.rotation.z);
+    Eigen::Quaterniond q(lidar_to_cam.rotation.w, lidar_to_cam.rotation.x, lidar_to_cam.rotation.y,
+                         lidar_to_cam.rotation.z);
     Eigen::Vector3d    t(lidar_to_cam.translation.x, lidar_to_cam.translation.y,
                          lidar_to_cam.translation.z);
     Eigen::Matrix3d    R = q.toRotationMatrix();
 
-    const auto& P    = cam_info.P;
-    const auto& K    = cam_info.K;
-    const auto& D    = cam_info.D;
-    const int   W    = static_cast<int>(cam_info.width);
-    const int   H    = static_cast<int>(cam_info.height);
+    const auto& P = cam_info.P;
+    const auto& K = cam_info.K;
+    const auto& D = cam_info.D;
+    const int   W = static_cast<int>(cam_info.width);
+    const int   H = static_cast<int>(cam_info.height);
     bool        rectified = std::all_of(D.begin(), D.end(), [](double v) { return v == 0.0; });
 
     std::vector<ProjectedPoint> result;
@@ -128,14 +132,14 @@ std::vector<ProjectedPoint> project(const msgs::PointCloud& cloud,
     return result;
 }
 
-std::array<uint8_t, 3> colorize(const ProjectedPoint& pt, ColorizeMode mode,
-                                 float range_min, float range_max) {
+std::array<uint8_t, 3> colorize(const ProjectedPoint& pt, ColorizeMode mode, float range_min,
+                                float range_max) {
     float span = range_max - range_min;
     if (span < 1e-6f) span = 1e-6f;
 
     if (mode == ColorizeMode::Intensity) {
-        uint8_t v = static_cast<uint8_t>(
-            std::clamp((pt.intensity - range_min) / span, 0.f, 1.f) * 255.f);
+        uint8_t v =
+            static_cast<uint8_t>(std::clamp((pt.intensity - range_min) / span, 0.f, 1.f) * 255.f);
         return {v, v, v};
     }
 
@@ -144,8 +148,8 @@ std::array<uint8_t, 3> colorize(const ProjectedPoint& pt, ColorizeMode mode,
     return turbo(t);
 }
 
-void render(msgs::Image& image, const std::vector<ProjectedPoint>& points,
-            ColorizeMode mode, int dot_radius) {
+void render(msgs::Image& image, const std::vector<ProjectedPoint>& points, ColorizeMode mode,
+            int dot_radius) {
     if (points.empty()) return;
 
     float d_min = points[0].depth, d_max = points[0].depth;
@@ -163,8 +167,8 @@ void render(msgs::Image& image, const std::vector<ProjectedPoint>& points,
             for (int dx = -dot_radius; dx <= dot_radius; ++dx) {
                 int px = pt.u + dx, py = pt.v + dy;
                 if (px < 0 || px >= W || py < 0 || py >= H) continue;
-                int idx            = (py * W + px) * 3;
-                image.data[idx]     = r;
+                int idx = (py * W + px) * 3;
+                image.data[idx] = r;
                 image.data[idx + 1] = g;
                 image.data[idx + 2] = b;
             }

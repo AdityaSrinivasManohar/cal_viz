@@ -38,11 +38,12 @@ static std::string image_to_info_topic(const std::string& topic) {
 // /kitti/camera_color_left/image_raw → camera_color_left  (strips image_* suffix)
 static std::string topic_short_name(const std::string& topic) {
     std::string t = topic.front() == '/' ? topic.substr(1) : topic;
-    auto last  = t.rfind('/');
+    auto        last = t.rfind('/');
     std::string tail = last == std::string::npos ? t : t.substr(last + 1);
     if (tail.starts_with("image") && last != std::string::npos) {
         auto parent = t.rfind('/', last - 1);
-        return parent == std::string::npos ? t.substr(0, last) : t.substr(parent + 1, last - parent - 1);
+        return parent == std::string::npos ? t.substr(0, last)
+                                           : t.substr(parent + 1, last - parent - 1);
     }
     return tail;
 }
@@ -105,9 +106,10 @@ int project(int argc, char** argv) {
     std::cout << "\n";
 
     // ── pass 1: collect TF, CameraInfo, and PointClouds ──────────────────────
-    TfBuffer                                           tf;
-    std::map<std::string, msgs::CameraInfo>            cam_infos;  // info_topic → CameraInfo
-    std::map<uint64_t, std::pair<std::string, msgs::PointCloud>> clouds;  // log_time_ns → {topic, cloud}
+    TfBuffer                                tf;
+    std::map<std::string, msgs::CameraInfo> cam_infos;  // info_topic → CameraInfo
+    std::map<uint64_t, std::pair<std::string, msgs::PointCloud>>
+        clouds;  // log_time_ns → {topic, cloud}
 
     RawMessage msg;
     while (reader.next(msg)) {
@@ -183,7 +185,8 @@ int project(int argc, char** argv) {
         }
 
         std::string pair_dir = topic_short_name(lidar_topic) + "__" + topic_short_name(msg.topic);
-        fs::path    out_path = fs::path(output) / pair_dir / (std::to_string(msg.log_time_ns) + ".jpg");
+        fs::path    out_path =
+            fs::path(output) / pair_dir / (std::to_string(msg.log_time_ns) + ".jpg");
         fs::create_directories(out_path.parent_path());
 
         int ok = stbi_write_jpg(out_path.string().c_str(), static_cast<int>(img->width),

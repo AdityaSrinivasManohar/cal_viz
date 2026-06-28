@@ -27,10 +27,10 @@ inline void write(const msgs::PointCloud& cloud, const std::filesystem::path& pa
       << "SIZE 4 4 4 4\n"
       << "TYPE F F F F\n"
       << "COUNT 1 1 1 1\n"
-      << "WIDTH "    << n << "\n"
+      << "WIDTH " << n << "\n"
       << "HEIGHT 1\n"
       << "VIEWPOINT 0 0 0 1 0 0 0\n"
-      << "POINTS "   << n << "\n"
+      << "POINTS " << n << "\n"
       << "DATA ascii\n";
 
     f << std::fixed;

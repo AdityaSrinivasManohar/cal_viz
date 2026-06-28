@@ -95,7 +95,7 @@ private:
     // after the 4-byte encapsulation header), not from the buffer start.
     void align(size_t n) {
         size_t data_pos = pos_ - 4;
-        pos_            = ((data_pos + n - 1) & ~(n - 1)) + 4;
+        pos_ = ((data_pos + n - 1) & ~(n - 1)) + 4;
     }
 
     void check(size_t n) {
@@ -110,7 +110,7 @@ private:
 msgs::BaseType read_header(CdrReader& r) {
     msgs::BaseType base;
     base.timestamp = {r.i32(), r.u32()};
-    base.frame_id  = r.str();
+    base.frame_id = r.str();
     return base;
 }
 
@@ -340,10 +340,10 @@ std::vector<StampedTransform> as_tf_message(const RawMessage& msg) {
         result.reserve(count);
 
         for (uint32_t i = 0; i < count; ++i) {
-            int32_t  sec     = r.i32();
+            int32_t  sec = r.i32();
             uint32_t nanosec = r.u32();
-            auto     parent  = r.str();
-            auto     child   = r.str();
+            auto     parent = r.str();
+            auto     child = r.str();
 
             double tx = r.f64(), ty = r.f64(), tz = r.f64();
             double qx = r.f64(), qy = r.f64(), qz = r.f64(), qw = r.f64();
