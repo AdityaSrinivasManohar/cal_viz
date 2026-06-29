@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 4.3)
 
 # Must be set before project() so CMake picks it up during compiler detection.
-if(NOT DEFINED CMAKE_CXX_COMPILER)
+# Only default to clang++-22 on Linux; macOS uses Apple Clang from Xcode.
+if(NOT DEFINED CMAKE_CXX_COMPILER AND UNIX AND NOT APPLE)
     set(CMAKE_CXX_COMPILER clang++-22)
 endif()
 
