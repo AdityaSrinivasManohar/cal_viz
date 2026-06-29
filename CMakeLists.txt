@@ -29,6 +29,8 @@ FetchContent_Declare(mcap
 )
 FetchContent_MakeAvailable(eigen mcap)
 
+find_package(zstd REQUIRED)
+
 add_executable(cal_viz
     src/main.cpp
     src/stb_impl.cpp
@@ -42,4 +44,4 @@ add_executable(cal_viz
 
 target_include_directories(cal_viz PRIVATE src third_party ${mcap_SOURCE_DIR}/cpp/mcap/include)
 target_compile_definitions(cal_viz PRIVATE MCAP_COMPRESSION_NO_LZ4)
-target_link_libraries(cal_viz PRIVATE Eigen3::Eigen zstd)
+target_link_libraries(cal_viz PRIVATE Eigen3::Eigen zstd::libzstd_static)
