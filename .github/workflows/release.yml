@@ -77,8 +77,8 @@ jobs:
       - name: Prepare release assets
         run: |
           for dir in artifacts/*/; do
-            target=$(basename "$dir")
-            mv "$dir/cal_viz" "cal_viz-${target}"
+            name=$(basename "$dir")
+            mv "$dir/cal_viz" "$name"
           done
 
       - name: Create GitHub release
