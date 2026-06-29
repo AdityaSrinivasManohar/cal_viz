@@ -4,6 +4,24 @@ Projects LiDAR point clouds onto camera images from `.mcap` files.
 
 ![example projection](docs/example_image.jpg)
 
+## Install
+
+Prebuilt binaries are attached to each [release](https://github.com/AdityaSrinivasManohar/cal_viz/releases): `cal_viz-linux-x86_64`, `cal_viz-linux-arm64`, and `cal_viz-macos-arm64`.
+
+```bash
+# Download the binary for your platform, then:
+chmod +x cal_viz-macos-arm64
+sudo mv cal_viz-macos-arm64 /usr/local/bin/cal_viz
+```
+
+On macOS the binary is unsigned, so Gatekeeper will block it on first run. Clear the quarantine flag once:
+
+```bash
+xattr -d com.apple.quarantine /usr/local/bin/cal_viz
+```
+
+Prefer to build from source? See [Build](#build) below.
+
 ## Commands
 
 ### `unbag` — extract raw sensor data
